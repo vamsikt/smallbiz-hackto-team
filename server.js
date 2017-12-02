@@ -8,6 +8,8 @@ const bodyParser = require("body-parser");
 const request = require("request");
 const apiai = require("apiai");
 const moment = require("moment-timezone");
+var config = require('./config.json')
+
 
 
 const app = express();
@@ -62,6 +64,11 @@ app.post("/webhook", function(req, res) {
 
       // iterate over each messaging event
       pageEntry.messaging.forEach(function(messagingEvent) {
+
+
+      
+
+
         let propertyNames = [];
         for (var prop in messagingEvent) {
           propertyNames.push(prop);
@@ -152,9 +159,9 @@ function receivedMessage(event) {
     let attachedImgURL = receivedMessage.attachments[0].payload.url;
     console.log("Received image message : %s" + attachedImgURL);
 
-  sendToClarify(attachedImgURL);
+    //attachment
   } else {
-    let apiaiSession = apiaiApp.textRequest(text, { sessionId: "tabby_cat" });
+    let apiaiSession = apiaiApp.textRequest(text, { sessionId: sender });
 
     apiaiSession.on("response", response => {
       console.log(JSON.stringify(response));
@@ -172,6 +179,15 @@ function receivedMessage(event) {
             "\n\nswitch to Time Stamp :" + estTimeStamp + "\n"
           );
           break;
+
+        case "input.welcome":
+          
+        sendLoginButton(sender);
+       // sendWelcomeButton(sender);
+
+
+
+        break;
         case "search":
 
         //write whatever shit we want
@@ -179,41 +195,7 @@ function receivedMessage(event) {
             response.result.parameters["userSearchText"] ||
             response.result.parameters["recommandType"]
           ) {
-            //&limit=1
-            let searchText = response.result.parameters["userSearchText"]
-              ? response.result.parameters["userSearchText"]
-              : "Leggings tank yoga 50-75 Apparel active";
-            console.log("searchText->" + searchText);
 
-            let searchShopifyURL =
-              HOST_URL +
-              "admin/products.json?title=" +
-              searchText +
-              "&limit=10";
-          
-            console.log(searchShopifyURL);
-            request.get(searchShopifyURL, (err, response, body) => {
-              if (!err && response.statusCode == 200) {
-                let product_json = JSON.parse(body);
-                console.log("shopify result-->" + product_json.products.length);
-
-                if (product_json.products.length < 1) {
-                  let errorMessage =
-                    "I failed to look up the your search item in our store.do you want to search something else?";
-                  prepareSendTextMessage(sender, errorMessage);
-                } else {
-                  sendProductsOptionsAsButtonTemplates(
-                    sender,
-                    product_json.products,
-                    searchText
-                  );
-                  // sendButtonMessages(sender, requestForHelpOnFeature);
-                }
-              } else {
-                let errorMessage = "I failed to look up the your search.";
-                prepareSendTextMessage(sender, errorMessage);
-              }
-            });
           } else {
             let errorMessage = "please narrow down your search.";
             prepareSendTextMessage(sender, errorMessage);
@@ -240,14 +222,113 @@ function receivedMessage(event) {
     apiaiSession.end();
   }
 }
+function sendLoginButton(recipientId){
+
+  console.log(
+    "[sendHelpOptionsAsButtonTemplates] Sending the help options menu"
+  );
+
+  var sectionButton = function(title, action, options) {
+    var payload = options | {};
+    payload = Object.assign(options, { action: action });
+    return {
+      type: "postback",
+      title: title,
+      payload: JSON.stringify(payload)
+    };
+  };
+  var templateElements = [];
+
+    templateElements.push({
+      title: "Login to Your Quickbooks",
+      buttons:[
+        {
+          "type": "account_link",
+          "url": "https://www.example.com/authorize"
+        }
+      ]
+    });
+
+  var messageData = {
+    recipient: {
+      id: recipientId
+    },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "generic",
+          elements: templateElements
+        }
+      }
+    }
+  };
+
+  sendMessagetoFB(messageData);
+}
+
+
+function sendWelcomeButton(recipientId){
+
+  console.log(
+    "[sendHelpOptionsAsButtonTemplates] Sending the help options menu"
+  );
+
+  var sectionButton = function(title, action, options) {
+    var payload = options | {};
+    payload = Object.assign(options, { action: action });
+    return {
+      type: "postback",
+      title: title,
+      payload: JSON.stringify(payload)
+    };
+  };
+  var templateElements = [];
+
+    templateElements.push({
+      title: "What you like to do today",
+      buttons: [
+        sectionButton("Send Invoice", "Send_Invoice", {          
+        }),
+        sectionButton("Create Invoice", "Create_Invoice", {
+        })
+      ]
+    });
+
+    templateElements.push({
+      title: "What you like to do today",
+      buttons: [
+        sectionButton("Send Invoice", "Get_Invoice", {          
+        }),
+        sectionButton("Create Invoice", "Get_Quote", {
+        })
+      ]
+    });
+  var messageData = {
+    recipient: {
+      id: recipientId
+    },
+    message: {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "generic",
+          elements: templateElements
+        }
+      }
+    }
+  };
+
+  sendMessagetoFB(messageData);
+  // });
+}
+
 
 function sendProductsOptionsAsButtonTemplates(recipientId, products,searchTag) {
   console.log(
     "[sendHelpOptionsAsButtonTemplates] Sending the help options menu"
   );
-  
-  // var products = shopify.product.list({ limit: requestPayload.limit });
-  // products.then(function(listOfProducs) {
+
   var sectionButton = function(title, action, options) {
     var payload = options | {};
     payload = Object.assign(options, { action: action });
@@ -326,84 +407,51 @@ function sendButtonMessages(recipientId, requestForHelpOnFeature) {
     };
   };
   let payloadAction = requestPayload.action
-    ? requestPayload.action
-    : "QR_GET_PRODUCT_LIST";
   console.log("requestPayload.action" + payloadAction);
   switch (payloadAction) {
-    case "QR_GET_PRODUCT_PRICE":
-      var sh_product = shopify.product.get(requestPayload.id);
-      sh_product.then(function(product) {
-        var options = "";
-        var variants = "";
 
-        product.variants.forEach(function(variant) {
-          console.log("checking price ->" + variant.price);
-          variants = variants + variant.title + ": " + variant.price + "\n";
-        });
 
-        // product.variants.map(function(variant) {
-        //   variants =
-        //   variants + variant.title + ": " + variant.price + "\n";
-        // });
-        var messageData = {
-          recipient: {
-            id: recipientId
-          },
-          message: {
-            text: variants.substring(0, 640)
-            // url:
-            // quick_replies: [
-            //   textButton("Get 3 products", "QR_GET_PRODUCT_LIST", { limit: 3 })
-            // ]
-          }
-        };
-        sendMessagetoFB(messageData);
-      });
+  case "Send_Invoice":
+  // var sh_product = shopify.product.get(requestPayload.id);
+  // sh_product.then(function(product) {
+    var options = "";
+    var variants = "Trying to query QB API";
 
+    var messageData = {
+      recipient: {
+        id: recipientId
+      },
+      message: {
+        text: variants.substring(0, 640)
+
+      }
+    };
+    sendMessagetoFB(messageData);
+  // });
+
+  break;
+
+  case "Create_Invoice":
+  // var sh_product = shopify.product.get(requestPayload.id);
+  // sh_product.then(function(product) {
+    var options = "";
+    var variants = "Creating Invoice";
+
+    var messageData = {
+      recipient: {
+        id: recipientId
+      },
+      message: {
+        text: variants.substring(0, 640)
+
+      }
+    };
+    sendMessagetoFB(messageData);
+  // });
       break;
 
-    case "QR_GET_PRODUCT_OPTIONS":
-      var sh_product = shopify.product.get(requestPayload.id);
-      sh_product.then(function(product) {
-        var options = "";
-        product.options.map(function(option) {
-          options =
-            options + option.name + ": " + option.values.join(",") + "\n";
-        });
-
-        var templateElements = [];
-
-        templateElements.push({
-          title: options,
-          subtitle: "Sizing/Colors",
-          buttons: [
-            {
-              type: "web_url",
-              url: "https://candyboxx.com/pages/sizing",
-              title: "Measure size"
-            }
-          ]
-        });
-
-        var messageData = {
-          recipient: {
-            id: recipientId
-          },
-          message: {
-            attachment: {
-              type: "template",
-              payload: {
-                template_type: "generic",
-                elements: templateElements
-              }
-            }
-          }
-        };
-
-        sendMessagetoFB(messageData);
-      });
-
-      break;
+      default:
+      // code to be executed if n is different from first 2 cases.
   }
 }
 
