@@ -181,6 +181,13 @@ function receivedMessage(event) {
           sendWelcomeButton(sender);
           break;
 
+
+          case "invoice":
+    
+    
+          get_Pending_Invoice(sender);
+    
+          break;
         case "estimate":
           get_Estimate(sender, aiParameters);
           break;
@@ -347,9 +354,9 @@ function processPayLoad(recipientId, requestForHelpOnFeature) {
    break;
     case "Pending_Invoice":
       var options = "";
-      var variants = "Trying to query QB API";
+      // var variants = "Trying to query QB API";
 
-      var variants = "Creating Invoice";
+      // var variants = "Creating Invoice";
 
       get_Pending_Invoice(recipientId);
       // prepareTextMessage(recipientId, variants, "");
@@ -627,7 +634,6 @@ function get_customer_contact_number(recipientId,reqPayload){
 }
 
 
-
 function get_Pending_Invoice(recipientId) {
   //query the pending invoice
   call_QB_API(
@@ -775,7 +781,14 @@ function get_Estimate(recipientId, aiParameters) {
                 c_amount: item.TotalAmt,
                 eid: item.Id,
                 Line: item.Line
-              })
+              }),
+              sectionButton(
+                "Get Contact Number ",
+                "Customer_Contact_Number",
+                {
+                  cid: item.CustomerRef.value
+                }
+              ),
             ]
           });
         } else if (item.TxnStatus == "Open") {
