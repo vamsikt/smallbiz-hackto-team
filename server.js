@@ -181,6 +181,13 @@ function receivedMessage(event) {
           sendWelcomeButton(sender);
           break;
 
+
+          case "invoice":
+    
+    
+          get_Pending_Invoice(sender);
+    
+          break;
         case "estimate":
           get_Estimate(sender, aiParameters);
           break;
@@ -347,9 +354,9 @@ function processPayLoad(recipientId, requestForHelpOnFeature) {
    break;
     case "Pending_Invoice":
       var options = "";
-      var variants = "Trying to query QB API";
+      // var variants = "Trying to query QB API";
 
-      var variants = "Creating Invoice";
+      // var variants = "Creating Invoice";
 
       get_Pending_Invoice(recipientId);
       // prepareTextMessage(recipientId, variants, "");
@@ -506,12 +513,13 @@ function getVendorExpenses(recipientId) {
       prepareTextMessage(recipientId, "Total Expense:" + total.toFixed(2), "");
 
       var format = "Top 5 Expenses by Vendors:\n";
+      format += "\n-------------------------------";
       console.log(exp_vend_list.sort(predicateBy("expense")));
       exp_vend_list = exp_vend_list.sort(predicateBy("expense"));
       var i = 0;
       exp_vend_list.forEach(function(val) {
         if (parseFloat(val.expense) > 500 && i < 5) {
-          format = format + val.expense + "\t-\t" + val.vendor + "\n";
+          format = format + val.expense + "-\t" + val.vendor + "\n";
           i++;
         }
       });
@@ -539,11 +547,11 @@ function getProfitLoss(recipientId) {
             build += "\nGROSS PROFIT:\t\t" + cols.Summary.ColData[1].value;
           }
           if (cols.Summary.ColData[0].value == "Total Expenses") {
-            build += "\n--------------------------------------";
+            build += "\n----------------------------------";
             build += "\nTotal Expenses:\t\t" + cols.Summary.ColData[1].value;
           }
           if (cols.Summary.ColData[0].value == "Net Operating Income") {
-            build += "\n--------------------------------------";
+            build += "\n----------------------------------";
             build +=
               "\nNet Operating Income:\t" + cols.Summary.ColData[1].value;
           }
@@ -554,7 +562,7 @@ function getProfitLoss(recipientId) {
           //   format += "\nTotal Other Expenses:\t"+ cols.Summary.ColData[1].value;
           // }
           if (cols.Summary.ColData[0].value == "Net Income") {
-            build += "\n--------------------------------------";
+            build += "\n----------------------------------";
             build += "\nNet Income:\t\t\t" + cols.Summary.ColData[1].value;
           }
         }
@@ -625,7 +633,6 @@ function get_customer_contact_number(recipientId,reqPayload){
 
 
 }
-
 
 
 function get_Pending_Invoice(recipientId) {
@@ -761,7 +768,7 @@ function get_Estimate(recipientId, aiParameters) {
               "Description : " +
               item.Line[0].Description +
               " " +
-              " Total :" +
+              "\n Total :" +
               item.TotalAmt +
               "\n Status : " +
               item.TxnStatus,
@@ -775,7 +782,14 @@ function get_Estimate(recipientId, aiParameters) {
                 c_amount: item.TotalAmt,
                 eid: item.Id,
                 Line: item.Line
-              })
+              }),
+              sectionButton(
+                "Get Contact Number ",
+                "Customer_Contact_Number",
+                {
+                  cid: item.CustomerRef.value
+                }
+              ),
             ]
           });
         } else if (item.TxnStatus == "Open") {
