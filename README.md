@@ -1,2 +1,2 @@
 # smallbiz-hackto-team
-smallbiz hack toronto
+smallbiz quickbooks hack toronto
