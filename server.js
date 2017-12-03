@@ -8,6 +8,7 @@ const FB_VALIDATION_TOKEN = config.fb_validation_token;
 const express = require("express");
 const bodyParser = require("body-parser");
 const request = require("request");
+var promise = require("promise");
 const apiai = require("apiai");
 const moment = require("moment-timezone");
 const qb_client_id = config.clientId;
@@ -206,15 +207,6 @@ function sendLoginButton(recipientId, templateElements) {
     "[sendHelpOptionsAsButtonTemplates] Sending the help options menu"
   );
 
-  var sectionButton = function(title, action, options) {
-    var payload = options | {};
-    payload = Object.assign(options, { action: action });
-    return {
-      type: "postback",
-      title: title,
-      payload: JSON.stringify(payload)
-    };
-  };
   var templateElements = [];
 
   var oAuth_QBurl =
@@ -230,26 +222,11 @@ function sendLoginButton(recipientId, templateElements) {
     ]
   });
 
-  var messageData = {
-    recipient: {
-      id: recipientId
-    },
-    message: {
-      attachment: {
-        type: "template",
-        payload: {
-          template_type: "generic",
-          elements: templateElements
-        }
-      }
-    }
-  };
-
-  sendMessagetoFB(messageData);
+  sendButtonMessages(recipientId, templateElements);
 }
 
-
-function  sectionButton(title, action, options) {
+/*format as buttons*/
+function sectionButton(title, action, options) {
   var payload = options | {};
   payload = Object.assign(options, { action: action });
   return {
@@ -257,7 +234,7 @@ function  sectionButton(title, action, options) {
     title: title,
     payload: JSON.stringify(payload)
   };
-};
+}
 
 function sendButtonMessages(recipientId, templateElements) {
   console.log("[sendButtonMessages] Sending the buttons ");
@@ -307,7 +284,6 @@ function sendWelcomeButton(recipientId) {
   });
 
   sendButtonMessages(recipientId, templateElements);
-
 
   var templateElements = [];
 
@@ -496,30 +472,37 @@ function prepareSendTextMessage(sender, aiText) {
 }
 
 function send_CompanyInfo(recipientId) {
-  // Set up API call (with OAuth2 accessToken)
-  var qb_url =
-    config.api_uri + config.realmId + "/companyinfo/" + config.realmId;
-  console.log("Making API call to: " + qb_url);
+  call_QB_API("/companyinfo/" + config.realmId, "GET", true).then(
+    function(data) {
+      console.log("data--"+JSON.stringify(data));
+      var variants = data.CompanyInfo.CompanyName;
+      prepareTextMessage(recipientId, variants, "");
+    },
+    function(err) {
+      console.error("%s; %s", err.message, url);
+      console.log("%j", err.res.statusCode);
+    }
+  );
+}
+function call_QB_API(endPoint, method, json) {
+  var qb_url_endppoint = qb_url + endPoint + config.realmId;
+
+  json = json || false;
   var requestObj = {
-    url: qb_url,
+    url: qb_url_endppoint,
     headers: {
+      method: method,
       Authorization: "Bearer " + config.qb_access_token,
       Accept: "application/json"
     }
   };
-
-  // Make QB  API call
-  request(requestObj, function(err, response) {
-    // Check if 401 response was returned - refresh tokens if so!
-    if (err || response.statusCode != 200) {
-      return res.json({ error: err, statusCode: response.statusCode });
-    }
-
-    var responseData = JSON.parse(response.body);
-    console.log("company response.body: " + JSON.stringify(response.body));
-  
-    var variants = responseData.CompanyInfo.CompanyName;
-    prepareTextMessage(recipientId, variants, "");
+  return new Promise(function(resolve, reject) {
+    request(requestObj, function(err, response, body) {
+      if (err || response.statusCode !== 200) {
+        return reject(err);
+      }
+      resolve(JSON.parse(body));
+    });
   });
 }
 
