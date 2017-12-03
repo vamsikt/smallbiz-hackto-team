@@ -185,7 +185,13 @@ function receivedMessage(event) {
           
           get_Estimate(sender,aiParameters);
           break;
-
+        case "expense":
+          console.log("Expense called");
+          getVendorExpenses(sender);
+          break;          
+        case "profitloss":
+          getProfitLoss(sender);
+          break;
         default:
           console.log(
             "\n\nswitch to prepareSendTextMessage Time Stamp :" +
@@ -383,7 +389,7 @@ function processPayLoad(recipientId, requestForHelpOnFeature) {
     };
   };
   let payloadAction = requestPayload.action;
-  console.log("requestPayload.action" + payloadAction);
+  console.log("requestPayload.action--" + payloadAction);
   switch (payloadAction) {
     case "Company_Info":
       send_CompanyInfo(recipientId);
@@ -407,6 +413,8 @@ function processPayLoad(recipientId, requestForHelpOnFeature) {
 
       // });
       break;
+
+    
 
     default:
     // code to be executed if n is different from first 2 cases.
@@ -455,6 +463,20 @@ function prepareSendTextMessage(sender, aiText) {
   sendMessagetoFB(messageData);
 }
 
+function send_CompanyInfo(recipientId) {  
+  call_QB_API("/companyinfo/" + config.realmId, "GET", true).then(
+    function(data) {
+      console.log("data--"+JSON.stringify(data));
+      var variants = data.CompanyInfo.CompanyName;      
+      prepareTextMessage(recipientId, variants, "");
+    },
+    function(err) {
+      console.error("%s; %s", err.message, url);
+      console.log("%j", err.res.statusCode);
+    }
+  );
+}
+
 
 function call_QB_API(endPoint, method,post_body,json) {
   var qb_url_endppoint = qb_url + endPoint ;
@@ -490,6 +512,102 @@ function call_QB_API(endPoint, method,post_body,json) {
       });
     });
   }else{
+
+let exp_vend_list = []
+function getVendorExpenses(recipientId) {
+  call_QB_API("/reports/VendorExpenses","GET",true).then(
+    function(data) {
+      console.log(JSON.stringify(data));
+      var total = 0;
+      data.Rows.Row.forEach(function (cols){
+
+        if(Object.keys(cols).includes('ColData')){
+          var vendorlist = {
+            vendor:cols.ColData[0].value,
+            expense:cols.ColData[1].value
+          }
+          console.log("COLS:"+cols.ColData[1].value);
+          total =  parseFloat(total) + parseFloat(cols.ColData[1].value);
+          console.log("TOTAL"+total.toFixed(2));
+          
+          exp_vend_list.push(vendorlist);  
+        }
+        
+      });
+      prepareTextMessage(recipientId, "Total Expense:" + total.toFixed(2),"");
+
+      var format = "Top 5 Expenses by Vendors:\n";
+      console.log(exp_vend_list.sort(predicateBy("expense")));
+      exp_vend_list = exp_vend_list.sort(predicateBy("expense"));
+      var i=0
+      exp_vend_list.forEach(function(val){
+        if(parseFloat(val.expense) > 500 && i <5)
+          format = format + val.expense +"\t-\t"+val.vendor + "\n";
+          i++;
+      });
+      prepareTextMessage(recipientId, format  , "");
+      
+    },
+    function(err) {
+
+    }
+    
+  )
+}
+function predicateBy(prop){
+  return function(a,b){
+     return parseFloat(b[prop]) - parseFloat(a[prop]);
+  }
+}
+function getProfitLoss(recipientId) {
+  call_QB_API("/reports/ProfitAndLoss","GET",true).then(
+    function(data) {
+      var build="PROFIT AND LOSS \n";
+      data.Rows.Row.forEach(function (cols){
+        if(!Object.keys(cols).includes('ColData')) {
+          if(cols.Summary.ColData[0].value == "Total Income") {
+            build += "\nTOTAL INCOME:\t\t"+ cols.Summary.ColData[1].value;
+          }
+
+          if(cols.Summary.ColData[0].value == "Gross Profit") {
+            build += "\nGROSS PROFIT:\t\t"+ cols.Summary.ColData[1].value;
+          }
+          if(cols.Summary.ColData[0].value == "Total Expenses") {
+            build += "\n--------------------------------------"
+            build += "\nTotal Expenses:\t\t"+ cols.Summary.ColData[1].value;
+          }
+          if(cols.Summary.ColData[0].value == "Net Operating Income") {
+            build += "\n--------------------------------------"
+            build += "\nNet Operating Income:\t"+ cols.Summary.ColData[1].value;
+          }
+          if(cols.Summary.ColData[0].value == "Total Other Expenses") {
+            build += "\nOther Expenses:\t\t"+ cols.Summary.ColData[1].value;
+          }
+          // if(cols.Summary.ColData[0].value == "Total Other Expenses") {
+          //   format += "\nTotal Other Expenses:\t"+ cols.Summary.ColData[1].value;
+          // }
+          if(cols.Summary.ColData[0].value == "Net Income") {
+            build += "\n--------------------------------------"
+            build += "\nNet Income:\t\t\t"+ cols.Summary.ColData[1].value;
+          }
+        }
+      });
+      prepareTextMessage(recipientId, build  , "");
+      
+
+    },
+    function(err) {
+      console.log(err);
+      
+    }
+    
+  )
+}
+
+function call_QB_API(endPoint, method, json) {
+  var qb_url_endppoint = qb_url + endPoint;
+  console.log(qb_url_endppoint);
+
   json = json || false;
   var requestObj = {
     url: qb_url_endppoint,
@@ -506,6 +624,7 @@ function call_QB_API(endPoint, method,post_body,json) {
         console.log("api call error-n-"+JSON.stringify(body));
         return reject(err);
       }
+
       console.log("api call sucess-\n-");
       
       resolve(JSON.parse(body));

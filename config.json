@@ -1,7 +1,8 @@
 {
 
  "page_access_token":"EAAY1hEccGycBAI1KXejoUWKeXmZBjMvD38RjJZAGFzxMvyAAhZBZBoUZAwGfNM9conxwQhRYiUF4EXFcX03nsUn1N6XHJIARA08nDwmTf4pKwWHqDUvCySanTrROaWgKpbxOPO2QKEsowNQ18ttn9vMp3RoLpm4wn24kEmZCbZCbAZDZD",
-  "clientId": "Q02T0nZiNWHt8kNhn3kquISSQbrBdC4xI3aJ5OEufYikg1XxZz",
+  
+ "clientId": "Q02T0nZiNWHt8kNhn3kquISSQbrBdC4xI3aJ5OEufYikg1XxZz",
   "clientSecret": "RIhCxXVZY98NnsOssO8Sa6zud7XPQD2KL5M5WBDn",
   "redirectUri": "https://localhost:3000/callback",
   "configurationEndpoint": "https://developer.api.intuit.com/.well-known/openid_sandbox_configuration/",
