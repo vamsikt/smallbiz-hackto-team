@@ -188,9 +188,10 @@ function receivedMessage(event) {
         case "expense":
           console.log("Expense called");
           getVendorExpenses(sender);
-                    
+          break;          
         case "profitloss":
           getProfitLoss(sender);
+          break;
         default:
           console.log(
             "\n\nswitch to prepareSendTextMessage Time Stamp :" +
@@ -523,37 +524,37 @@ function predicateBy(prop){
 function getProfitLoss(recipientId) {
   call_QB_API("/reports/ProfitAndLoss","GET",true).then(
     function(data) {
-      var format="PROFIT AND LOSS \n";
+      var build="PROFIT AND LOSS \n";
       data.Rows.Row.forEach(function (cols){
         if(!Object.keys(cols).includes('ColData')) {
           if(cols.Summary.ColData[0].value == "Total Income") {
-            format += "\nTOTAL INCOME:\t\t"+ cols.Summary.ColData[1].value;
+            build += "\nTOTAL INCOME:\t\t"+ cols.Summary.ColData[1].value;
           }
 
           if(cols.Summary.ColData[0].value == "Gross Profit") {
-            format += "\nGROSS PROFIT:\t\t"+ cols.Summary.ColData[1].value;
+            build += "\nGROSS PROFIT:\t\t"+ cols.Summary.ColData[1].value;
           }
           if(cols.Summary.ColData[0].value == "Total Expenses") {
-            format += "\n--------------------------------------"
-            format += "\nTotal Expenses:\t\t"+ cols.Summary.ColData[1].value;
+            build += "\n--------------------------------------"
+            build += "\nTotal Expenses:\t\t"+ cols.Summary.ColData[1].value;
           }
           if(cols.Summary.ColData[0].value == "Net Operating Income") {
-            format += "\n--------------------------------------"
-            format += "\nNet Operating Income:\t"+ cols.Summary.ColData[1].value;
+            build += "\n--------------------------------------"
+            build += "\nNet Operating Income:\t"+ cols.Summary.ColData[1].value;
           }
           if(cols.Summary.ColData[0].value == "Total Other Expenses") {
-            format += "\nOther Expenses:\t\t"+ cols.Summary.ColData[1].value;
+            build += "\nOther Expenses:\t\t"+ cols.Summary.ColData[1].value;
           }
           // if(cols.Summary.ColData[0].value == "Total Other Expenses") {
           //   format += "\nTotal Other Expenses:\t"+ cols.Summary.ColData[1].value;
           // }
           if(cols.Summary.ColData[0].value == "Net Income") {
-            format += "\n--------------------------------------"
-            format += "\nNet Income:\t\t\t"+ cols.Summary.ColData[1].value;
+            build += "\n--------------------------------------"
+            build += "\nNet Income:\t\t\t"+ cols.Summary.ColData[1].value;
           }
         }
       });
-      prepareTextMessage(recipientId, format  , "");
+      prepareTextMessage(recipientId, build  , "");
       
 
     },
