@@ -10,18 +10,18 @@ const bodyParser = require("body-parser");
 const request = require("request");
 const promise = require("promise");
 const apiai = require("apiai");
-const moment = require("moment-timezone");
+const moment_tz = require("moment-timezone");
 const qb_client_id = config.clientId;
 const qb_url = config.api_uri + config.realmId;
 const app = express();
 const apiaiApp = apiai(APIAI_TOKEN);
-
+const moment = require('moment');
 app.set("port", process.env.PORT || 5000);
-let currentTime = moment();
-let estTimeStamp = moment.tz(currentTime, "America/Toronto").format();
+let currentTime = moment_tz();
+let estTimeStamp = moment_tz.tz(currentTime, "America/Toronto").format();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
+const today_date = moment().format('YYYY-MM-DD');
 //Server start
 const server = app.listen(process.env.PORT || 5000, () => {
   console.log(
@@ -281,16 +281,16 @@ function sendButtonMessages(recipientId, templateElements) {
 function sendWelcomeButton(recipientId) {
   var templateElements = [];
 
-  templateElements.push({
-    title: "Get My Company Info",
-    buttons: [sectionButton("Company Name", "Company_Info", {})]
-  });
+  // templateElements.push({
+  //   title: "Get My Company Info",
+  //   buttons: [sectionButton("Company Name", "Company_Info", {})]
+  // });
 
   templateElements.push({
     title: "What you like to do today",
     buttons: [
-      sectionButton("Send Invoice", "Get_Invoice", {}),
-      sectionButton("Create Invoice", "Get_Quote", {})
+      sectionButton("See Pending Invoice", "Pending_Invoice", {}),
+      sectionButton("Send Remainder", "Send_Remainder", {})
     ]
   });
 
@@ -396,12 +396,15 @@ function processPayLoad(recipientId, requestForHelpOnFeature) {
 
       break;
 
-    case "Send_Invoice":
+    case "Pending_Invoice":
       var options = "";
       var variants = "Trying to query QB API";
 
       var variants = "Creating Invoice";
-      prepareTextMessage(recipientId, variants, "");
+
+
+      get_Pending_Invoice(recipientId);
+      // prepareTextMessage(recipientId, variants, "");
 
       break;
 
@@ -537,7 +540,13 @@ function call_QB_API(endPoint, method,post_body,json) {
   }
   }
 
-let exp_vend_list = []
+
+
+
+
+
+
+  let exp_vend_list = []
 function getVendorExpenses(recipientId) {
   call_QB_API("/reports/VendorExpenses","GET",'',true).then(
     function(data) {
@@ -643,6 +652,60 @@ function send_CompanyInfo(recipientId) {
   );
 }
 
+
+
+
+
+function get_Pending_Invoice(recipientId){
+//query the pending invoice
+call_QB_API("/query?query=SELECT * FROM Invoice ORDER BY Balance DESC", "GET",'' ,true).then(
+  function(data) {
+    var templateElements = [];
+   
+    console.log("today_date--"+today_date);
+    
+    var cnt=0;
+    // console.log("get_Estimate--"+JSON.stringify(data));      
+    data.QueryResponse.Invoice.forEach(function(item){
+  
+       //limiting 5
+      console.log("True--"+moment(today_date).isAfter(item.DueDate));
+  
+      if(moment(today_date).isAfter(item.DueDate) && item.Balance > 0.00 && cnt<6){
+        cnt=cnt+1;
+      console.log('CustomerRef: ' + JSON.stringify(item.CustomerRef.value));  
+      // variants = "estimating.."+item.CustomerRef.value;      
+      templateElements.push({
+        title: "Customer Name : "+item.CustomerRef.name,
+        subtitle: "Due Date : " +item.DueDate +" " +" Total :" +item.TotalAmt +'\n EmailStatus : '+item.EmailStatus,
+        buttons: [
+          sectionButton(
+            "Send a Remainders to "+item.CustomerRef.name,
+            "Customer_Invoice_Details",
+            {
+              id: item.CustomerRef.value,
+            }
+          )
+        ]
+      });
+      }
+
+    });
+    // prepareTextMessage(recipientId, variants, " ");
+     console.log('templateElements: ' + templateElements);   
+      sendButtonMessages(recipientId, templateElements);
+    ///
+  },
+
+  function(err) {
+    console.error("%s; %s", err.message, url);
+    console.log("%j", err.res.statusCode);
+  }
+);
+
+
+
+}
 function create_Invoice(recipientId,invPayload){
   //invPayload = JSON.parse(requestPayload);
   //cid: item.CustomerRef.value,
