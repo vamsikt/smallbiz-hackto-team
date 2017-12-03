@@ -464,7 +464,7 @@ function prepareSendTextMessage(sender, aiText) {
 }
 
 function send_CompanyInfo(recipientId) {  
-  call_QB_API("/companyinfo/" + config.realmId, "GET", true).then(
+  call_QB_API("/companyinfo/" + config.realmId, "GET",'',true).then(
     function(data) {
       console.log("data--"+JSON.stringify(data));
       var variants = data.CompanyInfo.CompanyName;      
@@ -482,7 +482,6 @@ function call_QB_API(endPoint, method,post_body,json) {
   var qb_url_endppoint = qb_url + endPoint ;
   console.log("qb_url_endppoint--"+qb_url_endppoint);
   if (method == "POST"){
-
     json = json || false;
     var requestObj = {
       url: qb_url_endppoint,
@@ -499,7 +498,6 @@ function call_QB_API(endPoint, method,post_body,json) {
       },
       form:post_body
     };
-
     return new promise(function(resolve, reject) {
       request.post(requestObj,function(err, response, body) {
         if (err || response.statusCode !== 200) {
@@ -512,10 +510,36 @@ function call_QB_API(endPoint, method,post_body,json) {
       });
     });
   }else{
+    var qb_url_endppoint = qb_url + endPoint;
+    console.log(qb_url_endppoint);
+  
+    json = json || false;
+    var requestObj = {
+      url: qb_url_endppoint,
+      method: method,
+      headers: { 
+        Authorization: "Bearer " + config.qb_access_token,
+        Accept: "application/json",
+      }
+    };
+    return new promise(function(resolve, reject) {
+      request(requestObj, function(err, response, body) {
+        if (err || response.statusCode !== 200) {
+          console.log("api call error-n-"+JSON.stringify(body));
+          return reject(err);
+        }
+  
+        console.log("api call sucess-\n-");
+        
+        resolve(JSON.parse(body));
+      });
+    });
+  }
+  }
 
 let exp_vend_list = []
 function getVendorExpenses(recipientId) {
-  call_QB_API("/reports/VendorExpenses","GET",true).then(
+  call_QB_API("/reports/VendorExpenses","GET",'',true).then(
     function(data) {
       console.log(JSON.stringify(data));
       var total = 0;
@@ -560,7 +584,7 @@ function predicateBy(prop){
   }
 }
 function getProfitLoss(recipientId) {
-  call_QB_API("/reports/ProfitAndLoss","GET",true).then(
+  call_QB_API("/reports/ProfitAndLoss","GET",'',true).then(
     function(data) {
       var build="PROFIT AND LOSS \n";
       data.Rows.Row.forEach(function (cols){
@@ -604,35 +628,6 @@ function getProfitLoss(recipientId) {
   )
 }
 
-function call_QB_API(endPoint, method, json) {
-  var qb_url_endppoint = qb_url + endPoint;
-  console.log(qb_url_endppoint);
-
-  json = json || false;
-  var requestObj = {
-    url: qb_url_endppoint,
-    method: method,
-    headers: { 
-      Authorization: "Bearer " + config.qb_access_token,
-      Accept: "application/json",
-    }
-  };
-
-  return new promise(function(resolve, reject) {
-    request(requestObj, function(err, response, body) {
-      if (err || response.statusCode !== 200) {
-        console.log("api call error-n-"+JSON.stringify(body));
-        return reject(err);
-      }
-
-      console.log("api call sucess-\n-");
-      
-      resolve(JSON.parse(body));
-    });
-  });
-}
-
-}
 
 function send_CompanyInfo(recipientId) {
   call_QB_API("/companyinfo/" + config.realmId, "GET",'' ,true).then(
@@ -775,57 +770,6 @@ function get_Estimate(recipientId,aiParameters){
       prepareTextMessage(recipientId, "error occured", " ");      
     }
   );
-
-
-  
 }
 
-// /* Webhook for API.ai to get response from the 3rd party API */
-// app.post("/ai", (req, res) => {
-//   var templateElements = [];
-//   switch (req.body.result.action) {
-//     case "shipping":
-//       console.log("\n\n*** Shipping *** Time Stamp :" + estTimeStamp + "\n");
-//       let address = req.body.result.parameters["geo-country"];
 
-//       break;
-
-//     case "search":
-//       console.log("\n case - search");
-//       let msg = "Converted Text to JSON";
-//       return res.json({
-//         speech: msg,
-//         displayText: msg,
-//         source: "search"
-//       });
-//       break;
-
-//     default:
-//     // code to be executed if n is different from first 2 cases.
-//   }
-// });
-
-
-function refresh_QB_API(Time) {
-  console.log("Refresh and update the file Message method :-");
-  request(
-    {
-      Accept: application/json,
-      Authorization: "Basic "+config.qb_access_token,
-      "Content-Type": "application/x-www-form-urlencoded",
-      Host: "oauth.platform.intuit.com",
-      "Cache-Control": "no-cache",
-      Body: "grant_type=refresh_token& refresh_token="+config.qb_refresh_token
-  
-    },
-    (error, response) => {
-      if (error) {
-        console.log("Error sending message: ", error);
-      } else if (response) {
-        console.log("Error: in send message ", JSON.stringify(response.body));
-        //TODO -- make a better way to update the token on fly
-        config.qb_access_token = JSON.parse(response.body).access_token;
-      }
-    }
-  );
-}
