@@ -8,7 +8,7 @@ const FB_VALIDATION_TOKEN = config.fb_validation_token;
 const express = require("express");
 const bodyParser = require("body-parser");
 const request = require("request");
-var promise = require("promise");
+const promise = require("promise");
 const apiai = require("apiai");
 const moment = require("moment-timezone");
 const qb_client_id = config.clientId;
@@ -496,7 +496,7 @@ function call_QB_API(endPoint, method, json) {
       Accept: "application/json"
     }
   };
-  return new Promise(function(resolve, reject) {
+  return new promise(function(resolve, reject) {
     request(requestObj, function(err, response, body) {
       if (err || response.statusCode !== 200) {
         return reject(err);
