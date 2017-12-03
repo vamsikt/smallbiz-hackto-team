@@ -590,7 +590,7 @@ function get_customer_contact_number(recipientId,reqPayload){
     true
   ).then(
     function(data) {
-
+  var format_contact_number=(data.Customer.PrimaryPhone.FreeFormNumber).replace(/[^\d]/g, '');
    var messageData= {
     "recipient":{
       "id":recipientId
@@ -604,8 +604,8 @@ function get_customer_contact_number(recipientId,reqPayload){
             "buttons":[
               {
                 "type":"phone_number",
-                "title":"Call Representative",
-                "payload":data.Customer.PrimaryPhone.FreeFormNumber
+                "title":"Call Customer ",
+                "payload":format_contact_number
               }
             ]
           }
