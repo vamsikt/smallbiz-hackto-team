@@ -1,6 +1,7 @@
 "use strict";
-const PAGE_ACCESS_TOKEN =
-  "EAAY1hEccGycBAI1KXejoUWKeXmZBjMvD38RjJZAGFzxMvyAAhZBZBoUZAwGfNM9conxwQhRYiUF4EXFcX03nsUn1N6XHJIARA08nDwmTf4pKwWHqDUvCySanTrROaWgKpbxOPO2QKEsowNQ18ttn9vMp3RoLpm4wn24kEmZCbZCbAZDZD";
+var config = require('./config.json')
+
+const PAGE_ACCESS_TOKEN =config.page_access_token;
 const APIAI_TOKEN = "8ab4f1896fb047ea95af3fbf24ccfb72";
 const FB_VALIDATION_TOKEN = "smallbizTo";
 const express = require("express");
@@ -8,8 +9,9 @@ const bodyParser = require("body-parser");
 const request = require("request");
 const apiai = require("apiai");
 const moment = require("moment-timezone");
-var config = require('./config.json')
 
+
+var qb_client_id=config.clientId;
 
 
 const app = express();
@@ -64,10 +66,6 @@ app.post("/webhook", function(req, res) {
 
       // iterate over each messaging event
       pageEntry.messaging.forEach(function(messagingEvent) {
-
-
-      
-
 
         let propertyNames = [];
         for (var prop in messagingEvent) {
@@ -182,8 +180,8 @@ function receivedMessage(event) {
 
         case "input.welcome":
           
-        sendLoginButton(sender);
-       // sendWelcomeButton(sender);
+       // sendLoginButton(sender);
+        sendWelcomeButton(sender);
 
 
 
@@ -239,12 +237,14 @@ function sendLoginButton(recipientId){
   };
   var templateElements = [];
 
+  var oAuth_QBurl = "https://appcenter.intuit.com/connect/oauth2?client_id="+qb_client_id;
+
     templateElements.push({
       title: "Login to Your Quickbooks",
       buttons:[
         {
           "type": "account_link",
-          "url": "https://www.example.com/authorize"
+          "url": oAuth_QBurl
         }
       ]
     });
@@ -286,11 +286,9 @@ function sendWelcomeButton(recipientId){
   var templateElements = [];
 
     templateElements.push({
-      title: "What you like to do today",
+      title: "Get My Company Info",
       buttons: [
-        sectionButton("Send Invoice", "Send_Invoice", {          
-        }),
-        sectionButton("Create Invoice", "Create_Invoice", {
+        sectionButton("Company Name", "Company_Info", {          
         })
       ]
     });
@@ -410,10 +408,13 @@ function sendButtonMessages(recipientId, requestForHelpOnFeature) {
   console.log("requestPayload.action" + payloadAction);
   switch (payloadAction) {
 
+  case "Company_Info" :
 
+      send_CompanyInfo(recipientId);
+
+        
+  break;
   case "Send_Invoice":
-  // var sh_product = shopify.product.get(requestPayload.id);
-  // sh_product.then(function(product) {
     var options = "";
     var variants = "Trying to query QB API";
 
@@ -478,6 +479,50 @@ function prepareSendTextMessage(sender, aiText) {
   let messageData = { recipient: { id: sender }, message: { text: aiText } };
   sendMessagetoFB(messageData);
 }
+
+
+
+function send_CompanyInfo(recipientId){
+   
+    // Set up API call (with OAuth2 accessToken)
+    var qb_url = config.api_uri + config.realmId + '/companyinfo/' + config.realmId
+    console.log('Making API call to: ' + qb_url)
+    var requestObj = {
+      url: qb_url,
+      headers: {
+        'Authorization': 'Bearer ' + config.qb_access_token,
+        'Accept': 'application/json'
+      }
+    }
+  
+    // Make API call
+    request(requestObj, function (err, response) {
+      // Check if 401 response was returned - refresh tokens if so!
+        if(err || response.statusCode != 200) {
+          return res.json({error: err, statusCode: response.statusCode})
+        }
+
+        var responseData= JSON.parse(response.body);
+        console.log('company response.body: ' + JSON.stringify(response.body))
+        // API Call was a success!
+        //res.json(JSON.parse(response.body))
+
+        var options = "";
+        var variants = responseData.CompanyInfo.CompanyName;
+    
+        var messageData = {
+          recipient: {
+            id: recipientId
+          },
+          message: {
+            text: variants.substring(0, 640)
+    
+          }
+        };
+        sendMessagetoFB(messageData);
+      });
+  
+    }
 
 /* Webhook for API.ai to get response from the 3rd party API */
 app.post("/ai", (req, res) => {
