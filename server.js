@@ -171,16 +171,19 @@ function receivedMessage(event) {
       console.log(JSON.stringify(response));
       let aiTextAction = response.result.action;
       let aiTextResponse = response.result.fulfillment.speech;
-
+      let aiParameters = response.result.parameters
       console.log("Returned from NLP API AI-->" + aiTextAction);
-
+      console.log("Returned from NLP API AI-aiParameters->" + aiParameters);
+      
       switch (aiTextAction) {
         case "input.welcome":
           // sendLoginButton(sender);
           sendWelcomeButton(sender);
           break;
 
-        case "search":
+        case "estimate":
+          
+          get_Estimate(sender,aiParameters);
           break;
         case "expense":
           console.log("Expense called");
@@ -194,7 +197,8 @@ function receivedMessage(event) {
               estTimeStamp +
               "\n"
           );
-          prepareSendTextMessage(sender, aiTextResponse);
+
+          break;
       }
     });
 
@@ -242,17 +246,17 @@ function sectionButton(title, action, options) {
 }
 
 function sendButtonMessages(recipientId, templateElements) {
-  console.log("[sendButtonMessages] Sending the buttons ");
+  console.log("[sendButtonMessages] Sending the buttons "+templateElements);
 
-  var sectionButton = function(title, action, options) {
-    var payload = options | {};
-    payload = Object.assign(options, { action: action });
-    return {
-      type: "postback",
-      title: title,
-      payload: JSON.stringify(payload)
-    };
-  };
+  // var sectionButton = function(title, action, options) {
+  //   var payload = options | {};
+  //   payload = Object.assign(options, { action: action });
+  //   return {
+  //     type: "postback",
+  //     title: title,
+  //     payload: JSON.stringify(payload)
+  //   };
+  // };
 
   var messageData = {
     recipient: {
@@ -272,6 +276,7 @@ function sendButtonMessages(recipientId, templateElements) {
   sendMessagetoFB(messageData);
 }
 
+
 function sendWelcomeButton(recipientId) {
   var templateElements = [];
 
@@ -289,8 +294,6 @@ function sendWelcomeButton(recipientId) {
   });
 
   sendButtonMessages(recipientId, templateElements);
-
-  
 
   // });
 }
@@ -416,19 +419,25 @@ function processPayLoad(recipientId, requestForHelpOnFeature) {
 }
 
 function prepareTextMessage(recipientId, variants, options) {
+  console.log("prepareTextMessage :-" + variants);
+  
   var messageData = {
     recipient: {
       id: recipientId
     },
     message: {
-      text: variants.substring(0, 640)
+      text: variants
     }
   };
+  console.log("prepareTextMessage :-" + "messageData");
+  
   sendMessagetoFB(messageData);
 }
 
 function sendMessagetoFB(messageData) {
-  console.log("Send Message method :-" + messageData);
+
+  
+  console.log("Send Message method :-" + JSON.stringify(messageData));
   request(
     {
       url: "https://graph.facebook.com/v2.6/me/messages",
@@ -571,12 +580,84 @@ function call_QB_API(endPoint, method, json) {
   return new promise(function(resolve, reject) {
     request(requestObj, function(err, response, body) {
       if (err || response.statusCode !== 200) {
+
+        console.log("api call error-\n-"+err);
+        
         return reject(err);
       }
-      console.log(JSON.stringify(body));
+      console.log("api call sucess-\n-");
+      
       resolve(JSON.parse(body));
     });
   });
+}
+
+function send_CompanyInfo(recipientId) {
+  call_QB_API("/companyinfo/" + config.realmId, "GET", true).then(
+    function(data) {
+      console.log("data--"+JSON.stringify(data));
+      var variants = data.CompanyInfo.CompanyName;
+      prepareTextMessage(recipientId, variants, "");
+    },
+    function(err) {
+      console.error("%s; %s", err.message, url);
+      console.log("%j", err.res.statusCode);
+    }
+  );
+}
+
+function get_Estimate(recipientId,aiParameters){
+ //https://sandbox-quickbooks.api.intuit.com/v3/company/123145927165634/query?query=SELECT%20%2A%20FROM%20Estimate%20WHERE%20TxnStatus%3D%20%27Pending%27&minorversion=4
+ console.log("get_Estimate--");
+ var templateElements = [];
+ var params =  ''
+  call_QB_API("/query?query=SELECT * FROM Estimate", "GET", true).then(
+    function(data) {
+      var variants=''
+      // console.log("get_Estimate--"+JSON.stringify(data));      
+      data.QueryResponse.Estimate.forEach(function(item){
+        
+        if(item.TxnStatus=='Pending'||item.TxnStatus=='Open'){
+        console.log('TxnStatus: ' + JSON.stringify(item.TxnStatus));
+        console.log('CustomerRef: ' + JSON.stringify(item.CustomerRef.value));  
+        // variants = "estimating.."+item.CustomerRef.value;      
+
+        templateElements.push({
+          title: "Customer Name : "+item.CustomerRef.name,
+          subtitle: "Description : " +item.Line[0].Description +" " +" Total :" +item.TotalAmt +'\n Estimate Status : '+item.TxnStatus,
+          buttons: [
+            sectionButton(
+              "Get Invoice Details",
+              "Customer_Invoice_Details",
+              {
+                id: item.CustomerRef.value,
+                eid: item.Id
+                
+              }
+            ),
+            sectionButton("Create Invoice", "Create_Invoice", {
+              cid: item.CustomerRef.value,
+              c_amount: item.TotalAmt,
+              eid: item.Id
+            })
+          ]
+        });
+        }  
+      });
+      // prepareTextMessage(recipientId, variants, " ");
+      //      
+        sendButtonMessages(recipientId, templateElements);
+      ///
+    },
+    function(err) {
+      console.error("%s; %s", err.message, url);
+      console.log("%j", err.res.statusCode);
+      prepareTextMessage(recipientId, "error occured", " ");      
+    }
+  );
+
+
+  
 }
 
 // /* Webhook for API.ai to get response from the 3rd party API */
@@ -603,3 +684,28 @@ function call_QB_API(endPoint, method, json) {
 //     // code to be executed if n is different from first 2 cases.
 //   }
 // });
+
+
+function refresh_QB_API(Time) {
+  console.log("Refresh and update the file Message method :-");
+  request(
+    {
+      Accept: application/json,
+      Authorization: "Basic "+config.qb_access_token,
+      "Content-Type": "application/x-www-form-urlencoded",
+      Host: "oauth.platform.intuit.com",
+      "Cache-Control": "no-cache",
+      Body: "grant_type=refresh_token& refresh_token="+config.qb_refresh_token
+  
+    },
+    (error, response) => {
+      if (error) {
+        console.log("Error sending message: ", error);
+      } else if (response) {
+        console.log("Error: in send message ", JSON.stringify(response.body));
+        //TODO -- make a better way to update the token on fly
+        config.qb_access_token = JSON.parse(response.body).access_token;
+      }
+    }
+  );
+}
