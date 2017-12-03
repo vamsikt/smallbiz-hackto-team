@@ -400,8 +400,10 @@ function processPayLoad(recipientId, requestForHelpOnFeature) {
       break;
 
     case "Create_Invoice":
-      var variants = "Creating Invoice";
-      prepareTextMessage(recipientId, variants, "");
+      // var variants = "Creating Invoice";
+
+      create_Invoice(recipientId,requestPayload);
+      // prepareTextMessage(recipientId, variants, "");
 
       // });
       break;
@@ -454,25 +456,54 @@ function prepareSendTextMessage(sender, aiText) {
 }
 
 
-function call_QB_API(endPoint, method,json) {
+function call_QB_API(endPoint, method,post_body,json) {
   var qb_url_endppoint = qb_url + endPoint ;
   console.log("qb_url_endppoint--"+qb_url_endppoint);
-  
+  if (method == "POST"){
+
+    json = json || false;
+    var requestObj = {
+      url: qb_url_endppoint,
+      method: method,
+      headers: {
+        Authorization: "Bearer " + config.qb_access_token,
+        Accept: "application/json",     
+        "Content-Length": 278.,
+        "Content-Type": "application/json",
+        Host: "sandbox-quickbooks.api.intuit.com",
+        "intuit_tid": "idg-0dqbz2nauuzfpiucvwoas5mu-18411232",
+        singularityheader: "appId=55*ctrlguid=1508534252*acctguid=87bcfab1-ad5a-4af1-95e0-7eed4f8a1800*ts=1512297205517*btid=7742*snapenable=True*guid=662a6dad-1f26-4d26-951b-6fb841f1ccdd*exitguid=8*unresolvedexitid=7927*cidfrom=390*etypeorder=HTTP*esubtype=HTTP*cidto=A149",
+       "User-Agent": "APIExplorer"
+      },
+      form:post_body
+    };
+
+    return new promise(function(resolve, reject) {
+      request.post(requestObj,function(err, response, body) {
+        if (err || response.statusCode !== 200) {
+          console.log("api call error-n-"+JSON.stringify(body));
+          return reject(err);
+        }
+        console.log("api call sucess-\n-");
+        
+        resolve(JSON.parse(body));
+      });
+    });
+  }else{
   json = json || false;
   var requestObj = {
     url: qb_url_endppoint,
-    headers: {
-      method: method,
+    method: method,
+    headers: { 
       Authorization: "Bearer " + config.qb_access_token,
-      Accept: "application/json"
+      Accept: "application/json",
     }
   };
+
   return new promise(function(resolve, reject) {
     request(requestObj, function(err, response, body) {
       if (err || response.statusCode !== 200) {
-
-        console.log("api call error-\n-"+err);
-        
+        console.log("api call error-n-"+JSON.stringify(body));
         return reject(err);
       }
       console.log("api call sucess-\n-");
@@ -482,8 +513,10 @@ function call_QB_API(endPoint, method,json) {
   });
 }
 
+}
+
 function send_CompanyInfo(recipientId) {
-  call_QB_API("/companyinfo/" + config.realmId, "GET", true).then(
+  call_QB_API("/companyinfo/" + config.realmId, "GET",'' ,true).then(
     function(data) {
       console.log("data--"+JSON.stringify(data));
       var variants = data.CompanyInfo.CompanyName;
@@ -496,43 +529,121 @@ function send_CompanyInfo(recipientId) {
   );
 }
 
+function create_Invoice(recipientId,invPayload){
+  //invPayload = JSON.parse(requestPayload);
+  //cid: item.CustomerRef.value,
+  // c_amount: item.TotalAmt,
+  // eid: item.Id,
+  // Line : item.Line
+  var inv_post_Body = 
+  {
+    "Line": [invPayload.Line[1]],
+    "CustomerRef": {
+      "value": invPayload.cid
+    }
+  }
+  console.log("create invoice"+JSON.stringify(inv_post_Body));
+  
+  call_QB_API("/invoice?minorversion=4", "POST",inv_post_Body, true).then(
+    function(data) {
+      var variants=''
+      // console.log("get_Estimate--"+JSON.stringify(data));      
+      data.QueryResponse.Estimate.forEach(function(item){
+        console.log('TxnStatus: ' + JSON.stringify(item.TxnStatus));
+        console.log('CustomerRef: ' + JSON.stringify(item.CustomerRef.value));  
+        // variants = "estimating.."+item.CustomerRef.value;      
+        templateElements.push({
+          title: "Invoice Created for : "+item.CustomerRef.name,
+          subtitle: "Total :" +item.TotalAmt,
+          buttons: [
+            sectionButton("Share the Invoice", "Share_Invoice", {
+              in_id: Invoice.Id,
+              doc_Number: Invoice.DocNumber,
+            })
+          ]
+        });
+    
+
+      });
+      // prepareTextMessage(recipientId, variants, " ");
+      //      
+        sendButtonMessages(recipientId, templateElements);
+      ///
+    },
+    function(err) {
+      console.error("%s; %s", err.message, url);
+      console.log("%j", err.res.statusCode);
+      prepareTextMessage(recipientId, "error occured", " ");      
+    }
+  );
+
+
+}
+
 function get_Estimate(recipientId,aiParameters){
  //https://sandbox-quickbooks.api.intuit.com/v3/company/123145927165634/query?query=SELECT%20%2A%20FROM%20Estimate%20WHERE%20TxnStatus%3D%20%27Pending%27&minorversion=4
  console.log("get_Estimate--");
  var templateElements = [];
  var params =  ''
-  call_QB_API("/query?query=SELECT * FROM Estimate", "GET", true).then(
+  call_QB_API("/query?query=SELECT * FROM Estimate", "GET",'',true).then(
     function(data) {
       var variants=''
       // console.log("get_Estimate--"+JSON.stringify(data));      
       data.QueryResponse.Estimate.forEach(function(item){
         
-        if(item.TxnStatus=='Pending'||item.TxnStatus=='Open'){
+        if(item.TxnStatus=='Pending'){
         console.log('TxnStatus: ' + JSON.stringify(item.TxnStatus));
         console.log('CustomerRef: ' + JSON.stringify(item.CustomerRef.value));  
         // variants = "estimating.."+item.CustomerRef.value;      
-
         templateElements.push({
           title: "Customer Name : "+item.CustomerRef.name,
-          subtitle: "Description : " +item.Line[0].Description +" " +" Total :" +item.TotalAmt +'\n Estimate Status : '+item.TxnStatus,
+          subtitle: "Description : " +item.Line[0].Description +" " +" Total :" +item.TotalAmt +'\n Status : '+item.TxnStatus,
           buttons: [
             sectionButton(
               "Get Invoice Details",
               "Customer_Invoice_Details",
               {
                 id: item.CustomerRef.value,
-                eid: item.Id
+                eid: item.Id,
+                
                 
               }
             ),
             sectionButton("Create Invoice", "Create_Invoice", {
               cid: item.CustomerRef.value,
               c_amount: item.TotalAmt,
-              eid: item.Id
+              eid: item.Id,
+              Line : item.Line
             })
           ]
         });
-        }  
+        }else if(item.TxnStatus=='Open'){
+          console.log('TxnStatus: ' + JSON.stringify(item.TxnStatus));
+          console.log('CustomerRef: ' + JSON.stringify(item.CustomerRef.value));  
+          // variants = "estimating.."+item.CustomerRef.value;      
+          templateElements.push({
+            title: "Customer Name : "+item.CustomerRef.name,
+            subtitle: "Description : " +item.Line[0].Description +" " +" Total :" +item.TotalAmt +'\n Estimate Status : '+item.TxnStatus,
+            buttons: [
+              sectionButton(
+                "Get Invoice Details",
+                "Customer_Invoice_Details",
+                {
+                  id: item.CustomerRef.value,
+                  eid: item.Id
+                  
+                }
+              ),
+              sectionButton("Send Remainder", "Send_Remainder", {
+                cid: item.CustomerRef.value,
+                c_amount: item.TotalAmt,
+                eid: item.Id
+              })
+            ]
+          });
+
+        }
+
       });
       // prepareTextMessage(recipientId, variants, " ");
       //      
